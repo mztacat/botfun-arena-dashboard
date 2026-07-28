@@ -1,3 +1,9 @@
 node_modules/
 .env
 .vercel/
+.vercel/
+*.lock
+bun.lock
+tool-results/
+upload/
+custom.db

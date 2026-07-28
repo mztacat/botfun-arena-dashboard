@@ -1,0 +1,11 @@
+{
+  "name": "botfun-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "NODE_ENV=production node server.js"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}
