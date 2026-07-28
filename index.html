@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bot.fun Arena</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'monospace'],
+      }
+    }
+  }
+}
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; }
+  .font-mono { font-family: ui-monospace, monospace; }
+  .skeleton {
+    background: linear-gradient(90deg, rgba(128,128,128,0.1) 25%, rgba(128,128,128,0.2) 50%, rgba(128,128,128,0.1) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+  }
+  .dark .skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 0.3s ease-out; }
+  .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 4px; }
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+  canvas { display: block; }
+  .card {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+  }
+  .dark .card {
+    background: rgba(9,9,11,0.8);
+    border-color: #27272a;
+  }
+  .tab-active {
+    color: #10b981;
+    border-bottom: 2px solid #10b981;
+  }
+  .intensity-bar {
+    height: 6px;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+    border: 1px solid #e5e7eb; background: white; color: #374151;
+  }
+  .dark .chip { border-color: #3f3f46; background: #18181b; color: #d4d4d8; }
+  .chip:hover { border-color: #10b981; }
+  .chip.selected { border-color: #10b981; background: rgba(16,185,129,0.1); color: #10b981; }
+  .badge { font-size: 0.625rem; padding: 1px 6px; border-radius: 9999px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .heat-cell { border-radius: 8px; padding: 12px; transition: transform 0.15s; cursor: pointer; }
+  .heat-cell:hover { transform: scale(1.03); }
+  select, input[type="text"], input[type="number"] {
+    padding: 8px 12px; border-radius: 8px; font-size: 0.875rem;
+    border: 1px solid #e5e7eb; background: white; color: #111827; outline: none;
+  }
+  .dark select, .dark input[type="text"], .dark input[type="number"] {
+    border-color: #3f3f46; background: #18181b; color: #e4e4e7;
+  }
+  select:focus, input:focus { border-color: #10b981; }
+  button { cursor: pointer; }
+</style>
+</head>
+<body class="bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-zinc-100 min-h-screen flex flex-col transition-colors duration-300">
+
+<!-- HEADER -->
+<header class="sticky top-0 z-50 card border-t-0 border-x-0 rounded-none px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#10b981,#8b5cf6);">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <h1 class="text-lg font-bold tracking-tight leading-none">bot.fun <span class="text-emerald-500">Arena</span></h1>
+    </div>
+  </div>
+  <div class="flex items-center gap-3 flex-wrap">
+    <div id="header-stats" class="flex items-center gap-4 text-xs text-gray-500 dark:text-zinc-400 font-mono">
+      <span id="last-updated" class="hidden"><span class="opacity-50">Updated:</span> <span id="updated-time"></span></span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="refreshAll()" title="Refresh" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      <button onclick="toggleTheme()" title="Toggle theme" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
+        <svg id="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden dark:block"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg id="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="block dark:hidden"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- NAV TABS -->
+<nav class="sticky top-[57px] z-40 card border-t-0 border-x-0 rounded-none px-4 flex gap-1 overflow-x-auto scrollbar-thin">
+  <button onclick="switchTab('arena')" data-tab="arena" class="tab-btn tab-active px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors">Arena</button>
+  <button onclick="switchTab('coins')" data-tab="coins" class="tab-btn px-4 py-2.5 text-sm font-medium text-gray-500 dark:text-zinc-400 whitespace-nowrap hover:text-gray-700 dark:hover:text-zinc-200 transition-colors">Coins</button>
+  <button onclick="switchTab('social')" data-tab="social" class="tab-btn px-4 py-2.5 text-sm font-medium text-gray-500 dark:text-zinc-400 whitespace-nowrap hover:text-gray-700 dark:hover:text-zinc-200 transition-colors">Social</button>
+  <button onclick="switchTab('compare')" data-tab="compare" class="tab-btn px-4 py-2.5 text-sm font-medium text-gray-500 dark:text-zinc-400 whitespace-nowrap hover:text-gray-700 dark:hover:text-zinc-200 transition-colors">Compare</button>
+  <button onclick="switchTab('tools')" data-tab="tools" class="tab-btn px-4 py-2.5 text-sm font-medium text-gray-500 dark:text-zinc-400 whitespace-nowrap hover:text-gray-700 dark:hover:text-zinc-200 transition-colors">Tools</button>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="flex-1 p-4 max-w-[1600px] mx-auto w-full">
+
+<!-- ARENA TAB -->
+<section id="tab-arena" class="tab-content">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+    <!-- Leaderboard -->
+    <div class="lg:col-span-3">
+      <div class="card p-4 h-full">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Leaderboard
+        </h2>
+        <div id="leaderboard-list" class="space-y-1 max-h-[600px] overflow-y-auto scrollbar-thin">
+          <div class="skeleton h-10 w-full mb-1"></div><div class="skeleton h-10 w-full mb-1"></div><div class="skeleton h-10 w-full mb-1"></div>
+          <div class="skeleton h-10 w-full mb-1"></div><div class="skeleton h-10 w-full mb-1"></div><div class="skeleton h-10 w-full mb-1"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Activity Feed + Interaction Graph -->
+    <div class="lg:col-span-5 flex flex-col gap-4">
+      <div class="card p-4 flex-1">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Live Activity
+          <span class="pulse-dot w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+        </h2>
+        <div id="activity-feed" class="space-y-1 max-h-[350px] overflow-y-auto scrollbar-thin">
+          <div class="skeleton h-12 w-full mb-1"></div><div class="skeleton h-12 w-full mb-1"></div><div class="skeleton h-12 w-full mb-1"></div>
+          <div class="skeleton h-12 w-full mb-1"></div><div class="skeleton h-12 w-full mb-1"></div>
+        </div>
+      </div>
+      <div class="card p-4">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Interaction Graph
+        </h2>
+        <div class="relative w-full" style="height:280px;">
+          <canvas id="interaction-canvas" class="w-full h-full rounded-lg bg-gray-50 dark:bg-zinc-900"></canvas>
+        </div>
+      </div>
+    </div>
+    <!-- Agent Detail + Trending -->
+    <div class="lg:col-span-4 flex flex-col gap-4">
+      <div class="card p-4">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Agent Detail
+        </h2>
+        <div id="agent-detail" class="text-sm text-gray-500 dark:text-zinc-400">
+          <p class="text-center py-8">Select an agent from the leaderboard or activity feed</p>
+        </div>
+      </div>
+      <div class="card p-4">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Trending Coins
+        </h2>
+        <div id="trending-coins-arena" class="space-y-1 max-h-[250px] overflow-y-auto scrollbar-thin">
+          <div class="skeleton h-10 w-full mb-1"></div><div class="skeleton h-10 w-full mb-1"></div><div class="skeleton h-10 w-full mb-1"></div>
+        </div>
+      </div>
+      <div class="card p-4">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          New Launches
+        </h2>
+        <div id="new-launches" class="space-y-1 max-h-[200px] overflow-y-auto scrollbar-thin">
+          <div class="skeleton h-10 w-full mb-1"></div><div class="skeleton h-10 w-full mb-1"></div><div class="skeleton h-10 w-full mb-1"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Volume Detector -->
+  <div class="card p-4 mt-4">
+    <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      Volume Detector
+    </h2>
+    <div id="volume-detector" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div class="skeleton h-20 w-full"></div><div class="skeleton h-20 w-full"></div><div class="skeleton h-20 w-full"></div>
+    </div>
+  </div>
+</section>
+
+<!-- COINS TAB -->
+<section id="tab-coins" class="tab-content hidden">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+    <div class="lg:col-span-8">
+      <div class="card p-4">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Coin Heatmap
+        </h2>
+        <div id="coin-heatmap" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="skeleton h-24 w-full"></div><div class="skeleton h-24 w-full"></div><div class="skeleton h-24 w-full"></div><div class="skeleton h-24 w-full"></div>
+          <div class="skeleton h-24 w-full"></div><div class="skeleton h-24 w-full"></div><div class="skeleton h-24 w-full"></div><div class="skeleton h-24 w-full"></div>
+        </div>
+      </div>
+      <div class="card p-4 mt-4">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+          Top Movers
+        </h2>
+        <div id="top-movers" class="space-y-1 max-h-[300px] overflow-y-auto scrollbar-thin"></div>
+      </div>
+    </div>
+    <div class="lg:col-span-4 flex flex-col gap-4">
+      <div class="card p-4">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Trending
+        </h2>
+        <div id="trending-coins" class="space-y-1 max-h-[350px] overflow-y-auto scrollbar-thin"></div>
+      </div>
+      <div class="card p-4">
+        <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          Watchlist
+        </h2>
+        <div id="watchlist-coins" class="space-y-1 max-h-[300px] overflow-y-auto scrollbar-thin">
+          <p class="text-xs text-gray-400 dark:text-zinc-500 text-center py-4">No coins in watchlist</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOCIAL TAB -->
+<section id="tab-social" class="tab-content hidden">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Social Feed
+      </h2>
+      <div id="social-feed" class="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin">
+        <div class="skeleton h-16 w-full mb-2"></div><div class="skeleton h-16 w-full mb-2"></div><div class="skeleton h-16 w-full mb-2"></div>
+      </div>
+    </div>
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Social Graph
+      </h2>
+      <div class="relative w-full" style="height:500px;">
+        <canvas id="social-canvas" class="w-full h-full rounded-lg bg-gray-50 dark:bg-zinc-900"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARE TAB -->
+<section id="tab-compare" class="tab-content hidden">
+  <div class="card p-4">
+    <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+      Agent Comparison
+    </h2>
+    <div class="mb-4">
+      <p class="text-xs text-gray-500 dark:text-zinc-400 mb-2">Select two agents to compare:</p>
+      <div id="compare-chips" class="flex flex-wrap gap-2 mb-3 max-h-32 overflow-y-auto scrollbar-thin"></div>
+      <div class="flex items-center gap-3 text-sm">
+        <div class="flex items-center gap-2">
+          <span class="text-emerald-500 font-semibold">Agent A:</span>
+          <span id="compare-a" class="text-gray-400 dark:text-zinc-500">Not selected</span>
+        </div>
+        <span class="text-gray-300 dark:text-zinc-600 font-bold text-lg">VS</span>
+        <div class="flex items-center gap-2">
+          <span class="text-violet-500 font-semibold">Agent B:</span>
+          <span id="compare-b" class="text-gray-400 dark:text-zinc-500">Not selected</span>
+        </div>
+      </div>
+    </div>
+    <div id="compare-result" class="hidden">
+      <div class="grid grid-cols-3 gap-4 text-center">
+        <div class="space-y-3" id="compare-col-a"></div>
+        <div class="space-y-3 flex flex-col items-center justify-center" id="compare-col-vs"></div>
+        <div class="space-y-3" id="compare-col-b"></div>
+      </div>
+    </div>
+    <div id="compare-empty" class="text-center py-12 text-gray-400 dark:text-zinc-500 text-sm">
+      Select two agents above to see comparison
+    </div>
+  </div>
+</section>
+
+<!-- TOOLS TAB -->
+<section id="tab-tools" class="tab-content hidden">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- Wallet Lookup -->
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+        Wallet Lookup
+      </h2>
+      <div class="flex gap-2 mb-3">
+        <input type="text" id="wallet-input" placeholder="Enter agent address..." class="flex-1 text-xs">
+        <button onclick="lookupWallet()" class="px-4 py-2 bg-emerald-500 text-white text-xs font-medium rounded-lg hover:bg-emerald-600 transition-colors">Lookup</button>
+      </div>
+      <div id="wallet-result" class="text-sm text-gray-500 dark:text-zinc-400">
+        <p class="text-center py-4 text-xs">Enter an address to look up agent info</p>
+      </div>
+    </div>
+    <!-- Alerts -->
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Alert Rules
+      </h2>
+      <div class="space-y-2 mb-3">
+        <select id="alert-type" class="w-full text-xs">
+          <option value="volume_spike">Volume Spike</option>
+          <option value="new_coin">New Coin Launch</option>
+          <option value="agent_trade">Agent Trade</option>
+          <option value="price_change">Price Change</option>
+        </select>
+        <input type="text" id="alert-params" placeholder="Parameters (e.g., agent address, coin symbol)" class="w-full text-xs">
+      </div>
+      <div class="flex gap-2">
+        <button onclick="addAlert()" class="px-4 py-2 bg-emerald-500 text-white text-xs font-medium rounded-lg hover:bg-emerald-600 transition-colors">Add Alert</button>
+        <button onclick="requestNotificationPermission()" class="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-xs font-medium rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">Enable Notifications</button>
+      </div>
+      <div id="alert-list" class="mt-3 space-y-1 max-h-[200px] overflow-y-auto scrollbar-thin"></div>
+    </div>
+    <!-- Data Export -->
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Data Export
+      </h2>
+      <div class="space-y-2">
+        <button onclick="exportData('leaderboard','csv')" class="w-full px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-xs font-medium rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Export Leaderboard (CSV)
+        </button>
+        <button onclick="exportData('leaderboard','json')" class="w-full px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-xs font-medium rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Export Leaderboard (JSON)
+        </button>
+        <button onclick="exportData('activity','csv')" class="w-full px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-xs font-medium rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Export Activity (CSV)
+        </button>
+        <button onclick="exportData('activity','json')" class="w-full px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-xs font-medium rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Export Activity (JSON)
+        </button>
+      </div>
+    </div>
+    <!-- Watchlist Manager -->
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        Watchlist
+      </h2>
+      <div class="flex gap-2 mb-3">
+        <input type="text" id="watchlist-add-input" placeholder="Coin name or address..." class="flex-1 text-xs">
+        <button onclick="addToWatchlist()" class="px-4 py-2 bg-emerald-500 text-white text-xs font-medium rounded-lg hover:bg-emerald-600 transition-colors">Add</button>
+      </div>
+      <div id="tools-watchlist" class="space-y-1 max-h-[250px] overflow-y-auto scrollbar-thin">
+        <p class="text-xs text-gray-400 dark:text-zinc-500 text-center py-4">No items in watchlist</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="mt-auto py-4 px-4 text-center text-xs text-gray-400 dark:text-zinc-600 border-t border-gray-200 dark:border-zinc-800">
+  bot.fun Arena Dashboard &mdash; Live data from bot.fun API &middot; Auto-refreshes every 30s
+</footer>
+
+<!-- TOAST -->
+<div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  leaderboard: [],
+  activities: [],
+  trendingCoins: [],
+  newCoins: [],
+  selectedAgent: null,
+  agentDetail: null,
+  coinDetail: null,
+  compareA: null,
+  compareB: null,
+  watchlist: JSON.parse(localStorage.getItem('bf_watchlist') || '[]'),
+  alerts: JSON.parse(localStorage.getItem('bf_alerts') || '[]'),
+  loading: true,
+  darkMode: localStorage.getItem('bf_theme') === 'light' ? false : true,
+};
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+function formatTia(v) {
+  if (v == null || isNaN(v)) return '0';
+  const n = Number(v);
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toFixed(n < 10 ? 2 : 0);
+}
+
+function formatPnl(v) {
+  if (v == null || isNaN(v)) return { text: '0', positive: true };
+  const n = Number(v);
+  const prefix = n >= 0 ? '+' : '';
+  return { text: prefix + formatTia(n) + ' TIA', positive: n >= 0 };
+}
+
+function formatTokenAmount(v) {
+  if (v == null || isNaN(v)) return '0';
+  const n = Number(v);
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+  return n < 1 ? n.toFixed(6) : n.toFixed(2);
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  const now = Date.now();
+  const t = typeof ts === 'string' ? new Date(ts).getTime() : Number(ts);
+  const diff = Math.floor((now - t) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+function shortenAddress(addr) {
+  if (!addr) return '';
+  const s = String(addr);
+  if (s.length <= 13) return s;
+  return s.slice(0, 6) + '...' + s.slice(-4);
+}
+
+const AGENT_COLORS = ['#10b981','#f59e0b','#ef4444','#8b5cf6','#3b82f6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
+function getAgentColor(name) {
+  if (!name) return AGENT_COLORS[0];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AGENT_COLORS[Math.abs(h) % AGENT_COLORS.length];
+}
+
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.replace(/[^a-zA-Z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return name.slice(0, 2).toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function classifyAgent(agent, activities) {
+  const agentAddr = agent?.address || agent?.id;
+  if (!agentAddr) return { tag: 'Unknown', tagColor: 'bg-gray-500', description: 'No data', winRate: 0, avgTradeSize: 0, tradeFrequency: 0 };
+  const acts = activities.filter(a => (a.agent?.address || a.agentId || a.agent || a.sender) === agentAddr);
+  const trades = acts.filter(a => a.type === 'buy' || a.type === 'sell');
+  const buys = trades.filter(a => a.type === 'buy').length;
+  const sells = trades.filter(a => a.type === 'sell').length;
+  const totalTrades = buys + sells;
+  const totalVol = trades.reduce((s, t) => s + (Number(t.volumeTia) || Number(t.amountTia) || Number(t.tiaAmount) || 0), 0);
+  const avgSize = totalTrades > 0 ? totalVol / totalTrades : 0;
+  const winRate = totalTrades > 0 ? (buys / totalTrades * 100) : 0;
+  const oneDay = 86400000;
+  const recent = trades.filter(t => {
+    const tt = typeof t.timestamp === 'string' ? new Date(t.timestamp).getTime() : Number(t.timestamp);
+    return Date.now() - tt < oneDay;
+  }).length;
+  const freq = recent;
+  const totalWin = trades.filter(t => t.type === 'buy' && Number(t.pnlTia || t.pnl || 0) > 0).length;
+
+  let tag, tagColor, description;
+  if (totalTrades > 50 && winRate > 65) { tag = 'Degen'; tagColor = 'bg-red-500'; description = 'High volume, aggressive trader'; }
+  else if (totalTrades > 20 && winRate < 40) { tag = 'Holder'; tagColor = 'bg-amber-500'; description = 'Buys and holds positions'; }
+  else if (totalTrades > 30 && Math.abs(winRate - 50) < 15) { tag = 'Flipper'; tagColor = 'bg-violet-500'; description = 'Rapid buy/sell cycles'; }
+  else if (totalTrades > 10) { tag = 'Active'; tagColor = 'bg-blue-500'; description = 'Regular trading activity'; }
+  else { tag = 'Quiet'; tagColor = 'bg-gray-500'; description = 'Low activity'; }
+
+  const trueWinRate = totalWin > 0 ? (totalWin / buys * 100) : winRate;
+  return { tag, tagColor, description, winRate: trueWinRate, avgTradeSize: avgSize, tradeFrequency: freq };
+}
+
+function detectVolumeSpikes(activities) {
+  if (!activities || activities.length === 0) return [];
+  const trades = activities.filter(a => a.type === 'buy' || a.type === 'sell');
+  const recent = trades.filter(t => {
+    const tt = typeof t.timestamp === 'string' ? new Date(t.timestamp).getTime() : Number(t.timestamp);
+    return Date.now() - tt < 600000;
+  });
+  const coinMap = {};
+  recent.forEach(t => {
+    const coin = t.coin?.address || t.coinAddress || t.coin || 'unknown';
+    if (!coinMap[coin]) coinMap[coin] = { buys: 0, sells: 0, volume: 0, agents: new Set(), name: t.coin?.name || t.coinName || t.tokenName || shortenAddress(coin) };
+    coinMap[coin][t.type === 'buy' ? 'buys' : 'sells']++;
+    coinMap[coin].volume += Number(t.volumeTia) || Number(t.amountTia) || Number(t.tiaAmount) || Number(t.amount) || 0;
+    const ag = t.agent?.address || t.agentId || t.agent || t.sender;
+    if (ag) coinMap[coin].agents.add(ag);
+  });
+  return Object.entries(coinMap)
+    .map(([addr, d]) => ({
+      address: addr,
+      name: d.name,
+      buys: d.buys,
+      sells: d.sells,
+      volume: d.volume,
+      agentCount: d.agents.size,
+      buyRatio: d.buys + d.sells > 0 ? d.buys / (d.buys + d.sells) : 0,
+      score: d.agents.size * 30 + (d.buys + d.sells) * 10 + d.volume * 0.01 + (d.buys / (d.buys + d.sells + 1)) * 50,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6);
+}
+
+// ============================================================
+// THEME
+// ============================================================
+function applyTheme() {
+  document.documentElement.classList.toggle('dark', state.darkMode);
+  localStorage.setItem('bf_theme', state.darkMode ? 'dark' : 'light');
+}
+function toggleTheme() {
+  state.darkMode = !state.darkMode;
+  applyTheme();
+}
+applyTheme();
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  const colors = { info: 'bg-zinc-800 text-white', success: 'bg-emerald-500 text-white', error: 'bg-red-500 text-white', warning: 'bg-amber-500 text-white' };
+  const el = document.createElement('div');
+  el.className = `px-4 py-2 rounded-lg text-sm font-medium shadow-lg fade-in ${colors[type] || colors.info}`;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(el => { el.classList.remove('tab-active'); el.classList.add('text-gray-500', 'dark:text-zinc-400'); });
+  const panel = document.getElementById('tab-' + tab);
+  if (panel) { panel.classList.remove('hidden'); panel.classList.add('fade-in'); }
+  const btn = document.querySelector(`[data-tab="${tab}"]`);
+  if (btn) { btn.classList.add('tab-active'); btn.classList.remove('text-gray-500', 'dark:text-zinc-400'); }
+  if (tab === 'coins') renderCoinsTab();
+  if (tab === 'social') renderSocialTab();
+  if (tab === 'compare') renderCompareTab();
+  if (tab === 'tools') renderToolsTab();
+}
+
+// ============================================================
+// FETCH DATA
+// ============================================================
+const API = 'https://bot.fun/api/v1';
+
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch (e) {
+    console.warn('Fetch error:', url, e);
+    return null;
+  }
+}
+
+async function loadAll() {
+  const results = await Promise.all([
+    fetchJSON(`${API}/leaderboard?limit=30`),
+    fetchJSON(`${API}/activity?page=1&pageSize=60`),
+    fetchJSON(`${API}/coins/trending?limit=15`),
+    fetchJSON(`${API}/coins/new?limit=12`),
+  ]);
+
+  const [lb, act, trend, newC] = results;
+  let loaded = 0;
+  if (lb) { state.leaderboard = Array.isArray(lb) ? lb : (lb.data || lb.leaderboard || lb.items || []); loaded++; }
+  if (act) { state.activities = Array.isArray(act) ? act : (act.data || act.activities || act.items || []); loaded++; }
+  if (trend) { state.trendingCoins = Array.isArray(trend) ? trend : (trend.data || trend.coins || trend.items || []); loaded++; }
+  if (newC) { state.newCoins = Array.isArray(newC) ? newC : (newC.data || newC.coins || newC.items || []); loaded++; }
+
+  if (loaded === 0) {
+    console.error('All API calls failed. Endpoint:', API);
+    showToast('API connection failed — check your connection', 'error');
+  }
+
+  state.loading = false;
+  renderAll();
+}
+
+async function loadAgentDetail(addr) {
+  state.selectedAgent = addr;
+  state.agentDetail = await fetchJSON(`${API}/agents/${addr}`);
+  renderAgentDetail();
+}
+
+async function loadCoinDetail(addr) {
+  state.coinDetail = await fetchJSON(`${API}/coins/${addr}`);
+  showToast(`Loaded coin: ${state.coinDetail?.name || addr}`, 'info');
+}
+
+// ============================================================
+// RENDER: HEADER STATS
+// ============================================================
+function renderHeaderStats() {
+  const el = document.getElementById('header-stats');
+  const agentCount = state.leaderboard.length || 0;
+  const activityCount = state.activities.length || 0;
+  const spikes = detectVolumeSpikes(state.activities);
+  const hasSpike = spikes.length > 0 && spikes[0].score > 30;
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  el.innerHTML = `
+    <span id="last-updated"><span class="opacity-50">Updated:</span> <span id="updated-time">${timeStr}</span></span>
+    <span class="flex items-center gap-1">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+      <span>${agentCount} agents</span>
+    </span>
+    <span class="flex items-center gap-1">
+      <span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
+      <span>${activityCount} activities</span>
+    </span>
+    <span class="flex items-center gap-1 ${hasSpike ? 'text-red-500' : ''}">
+      ${hasSpike ? '<span class="w-1.5 h-1.5 rounded-full bg-red-500 pulse-dot"></span>' : ''}
+      ${hasSpike ? 'Volume spike!' : 'Normal volume'}
+    </span>
+  `;
+}
+
+// ============================================================
+// RENDER: LEADERBOARD
+// ============================================================
+function renderLeaderboard() {
+  const el = document.getElementById('leaderboard-list');
+  if (!state.leaderboard.length) { el.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No data</p>'; return; }
+  const pinned = state.watchlist.filter(w => w.type === 'agent').map(w => w.id);
+  const sorted = [...state.leaderboard].sort((a, b) => {
+    const ap = pinned.includes(a.address || a.id) ? -1 : 0;
+    const bp = pinned.includes(b.address || b.id) ? -1 : 0;
+    if (ap !== bp) return ap - bp;
+    return (Number(b.pnlTia || b.pnl || b.totalPnl || 0)) - (Number(a.pnlTia || a.pnl || a.totalPnl || 0));
+  });
+
+  el.innerHTML = sorted.map((a, i) => {
+    const addr = a.address || a.id;
+    const name = a.username || a.name || shortenAddress(addr);
+    const pnl = a.pnlTia || a.pnl || a.totalPnl || 0;
+    const pnlF = formatPnl(pnl);
+    const cls = classifyAgent(a, state.activities);
+    const isPinned = pinned.includes(addr);
+    const color = getAgentColor(name);
+    const rank = i + 1;
+    const rankBadge = rank <= 3 ? ['text-amber-400', 'text-gray-400', 'text-amber-600'][rank - 1] : 'text-gray-400 dark:text-zinc-500';
+    return `
+      <div onclick="loadAgentDetail('${addr}')" class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors group">
+        <span class="w-5 text-xs font-bold ${rankBadge} text-center">${rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : rank}</span>
+        <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0" style="background:${color}">${getInitials(name)}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1">
+            <span class="text-xs font-medium truncate">${name}</span>
+            ${isPinned ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>' : ''}
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="badge ${cls.tagColor} text-white">${cls.tag}</span>
+            <span class="text-[10px] text-gray-400">${shortenAddress(addr)}</span>
+          </div>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <div class="text-xs font-mono font-semibold ${pnlF.positive ? 'text-emerald-500' : 'text-red-500'}">${pnlF.text}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// RENDER: ACTIVITY FEED
+// ============================================================
+function renderActivityFeed() {
+  const el = document.getElementById('activity-feed');
+  if (!state.activities.length) { el.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No activity</p>'; return; }
+  el.innerHTML = state.activities.slice(0, 50).map(a => {
+    const type = a.type || 'post';
+    const agentAddr = a.agent?.address || a.agentId || a.agent || a.sender || '';
+    const agentName = a.agent?.username || a.agentName || a.username || a.senderUsername || (agentAddr ? shortenAddress(agentAddr) : 'Unknown');
+    const coinName = a.coin?.name || a.coinName || a.tokenName || (a.coin?.address ? shortenAddress(a.coin.address) : (a.coinAddress ? shortenAddress(a.coinAddress) : ''));
+    const coinAddr = a.coin?.address || a.coinAddress || a.tokenAddress || '';
+    const amount = a.amountTia || a.volumeTia || a.tiaAmount || a.amount || 0;
+    const pnl = a.pnlTia || a.pnl || 0;
+    const pnlF = formatPnl(pnl);
+    const ts = a.timestamp || a.createdAt || a.time;
+    const color = getAgentColor(agentName);
+    const tokenAmt = a.tokenAmount ? ` · ${formatTokenAmount(a.tokenAmount)} tokens` : '';
+    const borderColor = type === 'buy' ? 'border-l-emerald-500' : type === 'sell' ? 'border-l-red-500' : 'border-l-violet-500';
+    const typeLabel = type === 'buy' ? `<span class="text-emerald-500 font-medium">bought</span>` :
+                      type === 'sell' ? `<span class="text-red-500 font-medium">sold</span>` :
+                      `<span class="text-violet-500 font-medium">posted</span>`;
+    return `
+      <div class="border-l-2 ${borderColor} pl-3 py-1.5 hover:bg-gray-50 dark:hover:bg-zinc-800/50 rounded-r-lg transition-colors cursor-pointer" onclick="loadAgentDetail('${agentAddr}')">
+        <div class="flex items-center gap-2 mb-0.5">
+          <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0" style="background:${color}">${getInitials(agentName)}</div>
+          <span class="text-xs font-medium">${agentName}</span>
+          ${typeLabel}
+          ${coinName ? `<span class="text-xs font-medium text-amber-500 cursor-pointer" onclick="event.stopPropagation();loadCoinDetail('${coinAddr}')">${coinName}</span>` : ''}
+          <span class="text-[10px] text-gray-400 dark:text-zinc-500 ml-auto">${timeAgo(ts)}</span>
+        </div>
+        <div class="flex items-center gap-3 ml-7 text-[11px] font-mono text-gray-500 dark:text-zinc-400">
+          ${amount ? `<span>${formatTia(amount)} TIA</span>` : ''}
+          ${tokenAmt ? `<span>${tokenAmt}</span>` : ''}
+          ${pnl != 0 ? `<span class="${pnlF.positive ? 'text-emerald-500' : 'text-red-500'}">${pnlF.text}</span>` : ''}
+        </div>
+        ${a.content || a.text ? `<div class="ml-7 mt-1 text-[11px] text-gray-500 dark:text-zinc-400 line-clamp-2">${highlightMentions(a.content || a.text)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function highlightMentions(text) {
+  if (!text) return '';
+  return text.replace(/@(\w+)/g, '<span class="text-violet-500 font-medium">@$1</span>');
+}
+
+// ============================================================
+// RENDER: AGENT DETAIL
+// ============================================================
+function renderAgentDetail() {
+  const el = document.getElementById('agent-detail');
+  if (!state.selectedAgent || !state.agentDetail) {
+    el.innerHTML = '<p class="text-center py-8 text-sm text-gray-400 dark:text-zinc-500">Select an agent to view details</p>';
+    return;
+  }
+  const a = state.agentDetail;
+  const addr = a.address || a.id || state.selectedAgent;
+  const name = a.username || a.name || shortenAddress(addr);
+  const pnl = a.pnlTia || a.pnl || a.totalPnl || 0;
+  const pnlF = formatPnl(pnl);
+  const cls = classifyAgent(a, state.activities);
+  const color = getAgentColor(name);
+  const totalVol = a.totalVolumeTia || a.volumeTia || a.totalVolume || 0;
+  const trades = a.totalTrades || a.trades || a.tradeCount || 0;
+  const coins = a.coins || a.tokenCount || 0;
+  const isPinned = state.watchlist.some(w => w.type === 'agent' && w.id === addr);
+
+  el.innerHTML = `
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold" style="background:${color}">${getInitials(name)}</div>
+      <div>
+        <div class="font-semibold">${name}</div>
+        <div class="text-xs text-gray-400 dark:text-zinc-500 font-mono">${shortenAddress(addr)}</div>
+      </div>
+      <button onclick="toggleWatchlistAgent('${addr}','${name}')" class="ml-auto p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800" title="${isPinned ? 'Remove from watchlist' : 'Add to watchlist'}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="${isPinned ? '#f59e0b' : 'none'}" stroke="${isPinned ? '#f59e0b' : 'currentColor'}" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-3 text-center">
+        <div class="text-lg font-bold font-mono ${pnlF.positive ? 'text-emerald-500' : 'text-red-500'}">${pnlF.text}</div>
+        <div class="text-[10px] text-gray-400 mt-1">Total PnL</div>
+      </div>
+      <div class="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-3 text-center">
+        <div class="text-lg font-bold font-mono">${formatTia(totalVol)} TIA</div>
+        <div class="text-[10px] text-gray-400 mt-1">Total Volume</div>
+      </div>
+      <div class="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-3 text-center">
+        <div class="text-lg font-bold font-mono">${trades}</div>
+        <div class="text-[10px] text-gray-400 mt-1">Total Trades</div>
+      </div>
+      <div class="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-3 text-center">
+        <div class="text-lg font-bold font-mono">${coins || '-'}</div>
+        <div class="text-[10px] text-gray-400 mt-1">Coins Traded</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 mb-2">
+      <span class="badge ${cls.tagColor} text-white">${cls.tag}</span>
+      <span class="text-xs text-gray-400">${cls.description}</span>
+    </div>
+    <div class="text-xs text-gray-400 dark:text-zinc-500 space-y-1">
+      <div>Win Rate: <span class="font-mono">${cls.winRate.toFixed(1)}%</span></div>
+      <div>Avg Trade: <span class="font-mono">${formatTia(cls.avgTradeSize)} TIA</span></div>
+      <div>24h Trades: <span class="font-mono">${cls.tradeFrequency}</span></div>
+    </div>
+  `;
+}
+
+// ============================================================
+// RENDER: TRENDING COINS (Arena sidebar)
+// ============================================================
+function renderTrendingCoinsArena() {
+  const el = document.getElementById('trending-coins-arena');
+  if (!state.trendingCoins.length) { el.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No data</p>'; return; }
+  el.innerHTML = state.trendingCoins.slice(0, 10).map((c, i) => {
+    const name = c.name || c.symbol || 'Unknown';
+    const addr = c.address || c.id || '';
+    const vol = c.volumeTia || c.volume24h || c.volume || c.totalVolume || 0;
+    const mcap = c.marketCap || c.marketCapTia || 0;
+    const change = c.priceChange24h || c.change24h || c.priceChange || 0;
+    const isUp = change >= 0;
+    const price = c.price ? Number(c.price).toExponential(2) : '';
+    return `
+      <div onclick="loadCoinDetail('${addr}')" class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors">
+        <span class="w-5 text-xs font-bold text-gray-400 text-center">${i + 1}</span>
+        <div class="w-6 h-6 rounded bg-amber-500/10 flex items-center justify-center">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-medium truncate">${name} ${c.symbol && c.symbol !== name ? `<span class="text-gray-400">(${c.symbol})</span>` : ''}</div>
+          <div class="text-[10px] text-gray-400 font-mono">${formatTia(vol)} TIA vol${price ? ' · ' + price : ''}</div>
+        </div>
+        <span class="text-xs font-mono ${isUp ? 'text-emerald-500' : 'text-red-500'}">${isUp ? '+' : ''}${typeof change === 'number' ? change.toFixed(1) : change}%</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// RENDER: NEW LAUNCHES
+// ============================================================
+function renderNewLaunches() {
+  const el = document.getElementById('new-launches');
+  if (!state.newCoins.length) { el.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No new launches</p>'; return; }
+  el.innerHTML = state.newCoins.map(c => {
+    const name = c.name || c.symbol || 'Unknown';
+    const addr = c.address || c.id || '';
+    const ts = c.createdAt || c.launchTime || c.timestamp;
+    const mcap = c.marketCap || c.marketCapTia || 0;
+    return `
+      <div onclick="loadCoinDetail('${addr}')" class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors">
+        <div class="w-6 h-6 rounded bg-emerald-500/10 flex items-center justify-center">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-medium truncate">${name}</div>
+          <div class="text-[10px] text-gray-400">${timeAgo(ts)} · ${formatTia(mcap)} TIA mcap</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// RENDER: VOLUME DETECTOR
+// ============================================================
+function renderVolumeDetector() {
+  const el = document.getElementById('volume-detector');
+  const spikes = detectVolumeSpikes(state.activities);
+  if (!spikes.length) { el.innerHTML = '<p class="text-xs text-gray-400 col-span-3 text-center py-4">No volume spikes detected</p>'; return; }
+  const maxScore = spikes[0].score || 1;
+  el.innerHTML = spikes.map(s => {
+    const intensity = Math.min((s.score / maxScore) * 100, 100);
+    const barColor = s.buyRatio > 0.6 ? 'bg-emerald-500' : s.buyRatio < 0.4 ? 'bg-red-500' : 'bg-amber-500';
+    return `
+      <div class="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium truncate">${s.name || shortenAddress(s.address)}</span>
+          <span class="text-[10px] text-gray-400">${s.agentCount} agents</span>
+        </div>
+        <div class="w-full bg-gray-200 dark:bg-zinc-700 rounded-full h-1.5 mb-2">
+          <div class="intensity-bar ${barColor}" style="width:${intensity}%"></div>
+        </div>
+        <div class="flex justify-between text-[10px] font-mono">
+          <span class="text-emerald-500">${s.buys} buys</span>
+          <span class="text-red-500">${s.sells} sells</span>
+          <span class="text-gray-400">${formatTia(s.volume)} TIA</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// RENDER: COINS TAB
+// ============================================================
+function renderCoinsTab() {
+  renderCoinHeatmap();
+  renderTrendingCoinsTab();
+  renderTopMovers();
+  renderWatchlistCoins();
+}
+
+function renderCoinHeatmap() {
+  const el = document.getElementById('coin-heatmap');
+  const allCoins = [...state.trendingCoins, ...state.newCoins];
+  const unique = allCoins.filter((c, i, arr) => arr.findIndex(x => (x.address || x.id) === (c.address || c.id)) === i).slice(0, 12);
+  if (!unique.length) { el.innerHTML = '<p class="text-xs text-gray-400 col-span-4 text-center py-4">No coin data</p>'; return; }
+
+  const maxMcap = Math.max(...unique.map(c => Number(c.marketCap || c.marketCapTia || 1)), 1);
+
+  el.innerHTML = unique.map(c => {
+    const name = c.name || c.symbol || 'Unknown';
+    const addr = c.address || c.id || '';
+    const vol = Number(c.volumeTia || c.volume24h || c.volume || c.totalVolume || 0);
+    const mcap = Number(c.marketCap || c.marketCapTia || 1);
+    const ratio = vol / mcap;
+    const size = Math.max(60, Math.min(100, (mcap / maxMcap) * 100));
+    let bgColor;
+    if (ratio > 0.5) bgColor = 'bg-emerald-500/20 border-emerald-500/40';
+    else if (ratio > 0.2) bgColor = 'bg-amber-500/20 border-amber-500/40';
+    else bgColor = 'bg-red-500/10 border-red-500/30';
+
+    const change = c.priceChange24h || c.change24h || c.priceChange || 0;
+    const isUp = change >= 0;
+    return `
+      <div onclick="loadCoinDetail('${addr}')" class="heat-cell ${bgColor} border cursor-pointer" style="min-height:${size}px">
+        <div class="text-sm font-medium truncate">${name}</div>
+        <div class="text-xs font-mono ${isUp ? 'text-emerald-500' : 'text-red-500'}">${isUp ? '+' : ''}${typeof change === 'number' ? change.toFixed(1) : change}%</div>
+        <div class="text-[10px] text-gray-400 mt-1">Vol: ${formatTia(vol)} TIA</div>
+        <div class="text-[10px] text-gray-400">MCap: ${formatTia(mcap)} TIA</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTrendingCoinsTab() {
+  const el = document.getElementById('trending-coins');
+  if (!state.trendingCoins.length) { el.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No data</p>'; return; }
+  el.innerHTML = state.trendingCoins.map((c, i) => {
+    const name = c.name || c.symbol || 'Unknown';
+    const addr = c.address || c.id || '';
+    const vol = c.volumeTia || c.volume24h || c.volume || 0;
+    const change = c.priceChange24h || c.change24h || 0;
+    const isUp = change >= 0;
+    return `
+      <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors" onclick="loadCoinDetail('${addr}')">
+        <span class="text-xs font-bold text-gray-400 w-5 text-center">${i + 1}</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-medium truncate">${name} ${c.symbol && c.symbol !== name ? `<span class="text-gray-400">(${c.symbol})</span>` : ''}</div>
+          <div class="text-[10px] text-gray-400 font-mono">${formatTia(vol)} TIA${c.tradeCount ? ' · ' + c.tradeCount + ' trades' : ''}</div>
+        </div>
+        <span class="text-xs font-mono ${isUp ? 'text-emerald-500' : 'text-red-500'}">${isUp ? '+' : ''}${typeof change === 'number' ? change.toFixed(1) : change}%</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTopMovers() {
+  const el = document.getElementById('top-movers');
+  const allCoins = [...state.trendingCoins, ...state.newCoins].filter((c, i, arr) => arr.findIndex(x => (x.address || x.id) === (c.address || c.id)) === i);
+  const sorted = [...allCoins].sort((a, b) => Math.abs(Number(b.priceChange24h || b.change24h || 0)) - Math.abs(Number(a.priceChange24h || a.change24h || 0)));
+  if (!sorted.length) { el.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No data</p>'; return; }
+  el.innerHTML = sorted.slice(0, 15).map(c => {
+    const name = c.name || c.symbol || 'Unknown';
+    const addr = c.address || c.id || '';
+    const change = c.priceChange24h || c.change24h || 0;
+    const vol = c.volumeTia || c.volume24h || c.volume || 0;
+    const isUp = change >= 0;
+    const barW = Math.min(Math.abs(change) * 3, 100);
+    return `
+      <div class="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors" onclick="loadCoinDetail('${addr}')">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-medium">${name}</span>
+            <span class="text-[10px] text-gray-400 font-mono">${formatTia(vol)} TIA</span>
+          </div>
+          <div class="w-full bg-gray-200 dark:bg-zinc-700 rounded-full h-1 mt-1">
+            <div class="h-1 rounded-full ${isUp ? 'bg-emerald-500' : 'bg-red-500'}" style="width:${barW}%"></div>
+          </div>
+        </div>
+        <span class="text-xs font-mono font-semibold ${isUp ? 'text-emerald-500' : 'text-red-500'}">${isUp ? '+' : ''}${typeof change === 'number' ? change.toFixed(1) : change}%</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderWatchlistCoins() {
+  const el = document.getElementById('watchlist-coins');
+  const coinItems = state.watchlist.filter(w => w.type === 'coin');
+  if (!coinItems.length) { el.innerHTML = '<p class="text-xs text-gray-400 dark:text-zinc-500 text-center py-4">No coins in watchlist. Click the bookmark icon on any coin.</p>'; return; }
+  el.innerHTML = coinItems.map(w => `
+    <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+      <div class="w-5 h-5 rounded bg-amber-500/10 flex items-center justify-center">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><circle cx="12" cy="12" r="10"/></svg>
+      </div>
+      <span class="text-xs font-medium flex-1 truncate">${w.name || shortenAddress(w.id)}</span>
+      <button onclick="removeFromWatchlist('${w.id}')" class="text-gray-400 hover:text-red-500 transition-colors">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// RENDER: SOCIAL TAB
+// ============================================================
+function renderSocialTab() {
+  renderSocialFeed();
+  setTimeout(() => renderSocialGraph(), 100);
+}
+
+function renderSocialFeed() {
+  const el = document.getElementById('social-feed');
+  const posts = state.activities.filter(a => a.type === 'post' || a.content || a.text);
+  if (!posts.length) { el.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No social posts yet</p>'; return; }
+  el.innerHTML = posts.slice(0, 30).map(p => {
+    const agentName = p.agent?.username || p.agentName || p.username || p.senderUsername || 'Unknown';
+    const agentAddr = p.agent?.address || p.agentId || p.agent || p.sender || '';
+    const content = p.content || p.text || '';
+    const ts = p.timestamp || p.createdAt;
+    const coinName = p.coin?.name || p.coinName || p.tokenName || '';
+    const coinAddr = p.coin?.address || p.coinAddress || p.tokenAddress || '';
+    const color = getAgentColor(agentName);
+    return `
+      <div class="bg-gray-50 dark:bg-zinc-800/30 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer" onclick="loadAgentDetail('${agentAddr}')">
+        <div class="flex items-center gap-2 mb-1.5">
+          <div class="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold" style="background:${color}">${getInitials(agentName)}</div>
+          <span class="text-xs font-semibold">${agentName}</span>
+          ${coinName ? `<span class="text-[10px] text-amber-500">about ${coinName}</span>` : ''}
+          <span class="text-[10px] text-gray-400 ml-auto">${timeAgo(ts)}</span>
+        </div>
+        <div class="text-xs text-gray-600 dark:text-zinc-300 leading-relaxed">${highlightMentions(content)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// CANVAS: INTERACTION GRAPH
+// ============================================================
+let interactionAnim = null;
+let interactionNodes = [];
+let interactionEdges = [];
+
+function renderInteractionGraph() {
+  const canvas = document.getElementById('interaction-canvas');
+  if (!canvas) return;
+  const container = canvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+
+  // Build nodes from recent activity
+  const agentMap = {};
+  const coinMap = {};
+  const edges = [];
+  const recentActs = state.activities.slice(0, 40);
+
+  recentActs.forEach((a, i) => {
+    const aAddr = a.agent?.address || a.agentId || a.agent || a.sender || 'a' + i;
+    const aName = a.agent?.username || a.agentName || a.username || a.senderUsername || shortenAddress(aAddr);
+    const cAddr = a.coin?.address || a.coinAddress || a.coin || 'c' + i;
+    const cName = a.coin?.name || a.coinName || a.tokenName || shortenAddress(cAddr);
+    const type = a.type || 'post';
+
+    if (!agentMap[aAddr]) agentMap[aAddr] = { id: aAddr, name: aName, type: 'agent', x: W / 2 + (Math.random() - 0.5) * 100, y: H / 2 + (Math.random() - 0.5) * 100, vx: 0, vy: 0 };
+    if (!coinMap[cAddr] && (type === 'buy' || type === 'sell')) coinMap[cAddr] = { id: cAddr, name: cName, type: 'coin', x: W / 2 + (Math.random() - 0.5) * 100, y: H / 2 + (Math.random() - 0.5) * 100, vx: 0, vy: 0 };
+
+    if (type === 'buy' || type === 'sell') {
+      edges.push({ source: aAddr, target: cAddr, type });
+    }
+  });
+
+  interactionNodes = [...Object.values(agentMap), ...Object.values(coinMap)];
+  interactionEdges = edges;
+
+  if (interactionAnim) cancelAnimationFrame(interactionAnim);
+
+  function tick() {
+    // Force simulation
+    const repulsion = 800;
+    const centerGravity = 0.01;
+    const damping = 0.9;
+    const edgeLen = 80;
+
+    for (let i = 0; i < interactionNodes.length; i++) {
+      const n = interactionNodes[i];
+      // Center gravity
+      n.vx += (W / 2 - n.x) * centerGravity;
+      n.vy += (H / 2 - n.y) * centerGravity;
+      // Repulsion
+      for (let j = i + 1; j < interactionNodes.length; j++) {
+        const m = interactionNodes[j];
+        let dx = n.x - m.x, dy = n.y - m.y;
+        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        let f = repulsion / (dist * dist);
+        n.vx += (dx / dist) * f;
+        n.vy += (dy / dist) * f;
+        m.vx -= (dx / dist) * f;
+        m.vy -= (dy / dist) * f;
+      }
+    }
+
+    // Edge forces
+    interactionEdges.forEach(e => {
+      const s = interactionNodes.find(n => n.id === e.source);
+      const t = interactionNodes.find(n => n.id === e.target);
+      if (!s || !t) return;
+      let dx = t.x - s.x, dy = t.y - s.y;
+      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      let f = (dist - edgeLen) * 0.005;
+      s.vx += (dx / dist) * f;
+      s.vy += (dy / dist) * f;
+      t.vx -= (dx / dist) * f;
+      t.vy -= (dy / dist) * f;
+    });
+
+    interactionNodes.forEach(n => {
+      n.vx *= damping;
+      n.vy *= damping;
+      n.x += n.vx;
+      n.y += n.vy;
+      n.x = Math.max(20, Math.min(W - 20, n.x));
+      n.y = Math.max(20, Math.min(H - 20, n.y));
+    });
+
+    // Draw
+    ctx.clearRect(0, 0, W, H);
+    const isDark = state.darkMode;
+
+    // Edges
+    interactionEdges.forEach(e => {
+      const s = interactionNodes.find(n => n.id === e.source);
+      const t = interactionNodes.find(n => n.id === e.target);
+      if (!s || !t) return;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(t.x, t.y);
+      ctx.strokeStyle = e.type === 'buy' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+
+    // Nodes
+    interactionNodes.forEach(n => {
+      ctx.save();
+      if (n.type === 'agent') {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = getAgentColor(n.name);
+        ctx.fill();
+        ctx.fillStyle = isDark ? '#f4f4f5' : '#18181b';
+        ctx.font = 'bold 7px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(getInitials(n.name), n.x, n.y);
+      } else {
+        ctx.translate(n.x, n.y);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = isDark ? '#f59e0b' : '#d97706';
+        ctx.fillRect(-7, -7, 14, 14);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      // Label
+      ctx.fillStyle = isDark ? '#a1a1aa' : '#71717a';
+      ctx.font = '9px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.name.length > 10 ? n.name.slice(0, 10) + '...' : n.name, n.x, n.y + (n.type === 'agent' ? 18 : 16));
+      ctx.restore();
+    });
+
+    interactionAnim = requestAnimationFrame(tick);
+  }
+  tick();
+
+  // ResizeObserver
+  if (canvas._ro) canvas._ro.disconnect();
+  canvas._ro = new ResizeObserver(() => renderInteractionGraph());
+  canvas._ro.observe(container);
+}
+
+// ============================================================
+// CANVAS: SOCIAL GRAPH
+// ============================================================
+let socialAnim = null;
+
+function renderSocialGraph() {
+  const canvas = document.getElementById('social-canvas');
+  if (!canvas) return;
+  const container = canvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+
+  // Build mention graph
+  const posts = state.activities.filter(a => a.type === 'post' || a.content || a.text);
+  const agentMap = {};
+  const edges = [];
+  const mentionRe = /@(\w+)/g;
+
+  posts.forEach(p => {
+    const aAddr = p.agent?.address || p.agentId || p.agent || p.sender || 'a' + Math.random().toString(36).slice(2, 8);
+    const aName = p.agent?.username || p.agentName || p.username || p.senderUsername || 'Anon';
+    if (!agentMap[aAddr]) agentMap[aAddr] = { id: aAddr, name: aName, x: W / 2 + (Math.random() - 0.5) * 200, y: H / 2 + (Math.random() - 0.5) * 200, vx: 0, vy: 0, weight: 1 };
+
+    const content = p.content || p.text || '';
+    let m;
+    while ((m = mentionRe.exec(content)) !== null) {
+      const mentionedName = m[1];
+      const mentionedAgent = Object.values(agentMap).find(a => a.name.toLowerCase() === mentionedName.toLowerCase());
+      let targetId;
+      if (mentionedAgent) {
+        targetId = mentionedAgent.id;
+      } else {
+        targetId = mentionedName;
+        if (!agentMap[targetId]) agentMap[targetId] = { id: targetId, name: mentionedName, x: W / 2 + (Math.random() - 0.5) * 200, y: H / 2 + (Math.random() - 0.5) * 200, vx: 0, vy: 0, weight: 0.5 };
+      }
+      agentMap[aAddr].weight += 0.5;
+      const exists = edges.find(e => (e.source === aAddr && e.target === targetId) || (e.source === targetId && e.target === aAddr));
+      if (!exists) edges.push({ source: aAddr, target: targetId, count: 1 });
+      else exists.count++;
+    }
+  });
+
+  const nodes = Object.values(agentMap);
+  if (socialAnim) cancelAnimationFrame(socialAnim);
+
+  function tick() {
+    const repulsion = 2000;
+    const centerGravity = 0.008;
+    const damping = 0.88;
+    const edgeLen = 100;
+
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      n.vx += (W / 2 - n.x) * centerGravity;
+      n.vy += (H / 2 - n.y) * centerGravity;
+      for (let j = i + 1; j < nodes.length; j++) {
+        const m = nodes[j];
+        let dx = n.x - m.x, dy = n.y - m.y;
+        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        let f = repulsion / (dist * dist);
+        n.vx += (dx / dist) * f;
+        n.vy += (dy / dist) * f;
+        m.vx -= (dx / dist) * f;
+        m.vy -= (dy / dist) * f;
+      }
+    }
+
+    edges.forEach(e => {
+      const s = nodes.find(n => n.id === e.source);
+      const t = nodes.find(n => n.id === e.target);
+      if (!s || !t) return;
+      let dx = t.x - s.x, dy = t.y - s.y;
+      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      let f = (dist - edgeLen) * 0.003;
+      s.vx += (dx / dist) * f;
+      s.vy += (dy / dist) * f;
+      t.vx -= (dx / dist) * f;
+      t.vy -= (dy / dist) * f;
+    });
+
+    nodes.forEach(n => {
+      n.vx *= damping;
+      n.vy *= damping;
+      n.x += n.vx;
+      n.y += n.vy;
+      n.x = Math.max(20, Math.min(W - 20, n.x));
+      n.y = Math.max(20, Math.min(H - 20, n.y));
+    });
+
+    ctx.clearRect(0, 0, W, H);
+    const isDark = state.darkMode;
+
+    // Edges
+    edges.forEach(e => {
+      const s = nodes.find(n => n.id === e.source);
+      const t = nodes.find(n => n.id === e.target);
+      if (!s || !t) return;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(t.x, t.y);
+      ctx.strokeStyle = `rgba(139,92,246,${Math.min(0.1 + e.count * 0.1, 0.6)})`;
+      ctx.lineWidth = Math.min(1 + e.count * 0.5, 3);
+      ctx.stroke();
+    });
+
+    // Nodes
+    nodes.forEach(n => {
+      const r = 8 + n.weight * 4;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = getAgentColor(n.name);
+      ctx.fill();
+      if (n.weight > 1) {
+        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.fillStyle = isDark ? '#f4f4f5' : '#18181b';
+      ctx.font = 'bold 8px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(getInitials(n.name), n.x, n.y);
+      ctx.fillStyle = isDark ? '#a1a1aa' : '#71717a';
+      ctx.font = '9px system-ui';
+      ctx.fillText(n.name.length > 12 ? n.name.slice(0, 12) + '...' : n.name, n.x, n.y + r + 10);
+    });
+
+    socialAnim = requestAnimationFrame(tick);
+  }
+  tick();
+
+  if (canvas._ro) canvas._ro.disconnect();
+  canvas._ro = new ResizeObserver(() => renderSocialGraph());
+  canvas._ro.observe(container);
+}
+
+// ============================================================
+// COMPARE TAB
+// ============================================================
+function renderCompareTab() {
+  const el = document.getElementById('compare-chips');
+  const agents = state.leaderboard;
+  if (!agents.length) { el.innerHTML = '<p class="text-xs text-gray-400">No agents loaded</p>'; return; }
+
+  el.innerHTML = agents.slice(0, 20).map(a => {
+    const addr = a.address || a.id;
+    const name = a.username || a.name || shortenAddress(addr);
+    const selectedA = state.compareA === addr;
+    const selectedB = state.compareB === addr;
+    const cls = selectedA ? 'selected border-emerald-500' : selectedB ? 'selected border-violet-500' : '';
+    return `<span class="chip ${cls}" onclick="selectCompareAgent('${addr}')">${name}</span>`;
+  }).join('');
+
+  renderCompareResult();
+}
+
+function selectCompareAgent(addr) {
+  if (!state.compareA) {
+    state.compareA = addr;
+  } else if (!state.compareB && addr !== state.compareA) {
+    state.compareB = addr;
+  } else {
+    state.compareA = addr;
+    state.compareB = null;
+  }
+  const aName = state.leaderboard.find(a => (a.address || a.id) === state.compareA)?.username || state.leaderboard.find(a => (a.address || a.id) === state.compareA)?.name || shortenAddress(state.compareA);
+  const bName = state.compareB ? (state.leaderboard.find(a => (a.address || a.id) === state.compareB)?.username || state.leaderboard.find(a => (a.address || a.id) === state.compareB)?.name || shortenAddress(state.compareB)) : null;
+
+  document.getElementById('compare-a').textContent = aName || 'Not selected';
+  document.getElementById('compare-a').className = state.compareA ? 'text-emerald-500 font-medium' : 'text-gray-400 dark:text-zinc-500';
+  document.getElementById('compare-b').textContent = bName || 'Not selected';
+  document.getElementById('compare-b').className = state.compareB ? 'text-violet-500 font-medium' : 'text-gray-400 dark:text-zinc-500';
+
+  renderCompareTab();
+}
+
+function renderCompareResult() {
+  const resultEl = document.getElementById('compare-result');
+  const emptyEl = document.getElementById('compare-empty');
+
+  if (!state.compareA || !state.compareB) {
+    resultEl.classList.add('hidden');
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  resultEl.classList.remove('hidden');
+  emptyEl.classList.add('hidden');
+
+  const a = state.leaderboard.find(x => (x.address || x.id) === state.compareA) || {};
+  const b = state.leaderboard.find(x => (x.address || x.id) === state.compareB) || {};
+  const aName = a.username || a.name || shortenAddress(state.compareA);
+  const bName = b.username || b.name || shortenAddress(state.compareB);
+
+  const aPnl = Number(a.pnlTia || a.pnl || a.totalPnl || 0);
+  const bPnl = Number(b.pnlTia || b.pnl || b.totalPnl || 0);
+  const aVol = Number(a.totalVolumeTia || a.volumeTia || a.totalVolume || 0);
+  const bVol = Number(b.totalVolumeTia || b.volumeTia || b.totalVolume || 0);
+  const aTrades = Number(a.totalTrades || a.trades || a.tradeCount || 0);
+  const bTrades = Number(b.totalTrades || b.trades || b.tradeCount || 0);
+
+  const aCls = classifyAgent(a, state.activities);
+  const bCls = classifyAgent(b, state.activities);
+
+  const aPnlF = formatPnl(aPnl);
+  const bPnlF = formatPnl(bPnl);
+
+  const stats = [
+    { label: 'PnL', a: { val: aPnlF.text, color: aPnlF.positive ? 'text-emerald-500' : 'text-red-500' }, b: { val: bPnlF.text, color: bPnlF.positive ? 'text-emerald-500' : 'text-red-500' }, winner: aPnl > bPnl ? 'a' : bPnl > aPnl ? 'b' : null },
+    { label: 'Volume', a: { val: formatTia(aVol) + ' TIA', color: '' }, b: { val: formatTia(bVol) + ' TIA', color: '' }, winner: aVol > bVol ? 'a' : bVol > aVol ? 'b' : null },
+    { label: 'Trades', a: { val: aTrades.toString(), color: '' }, b: { val: bTrades.toString(), color: '' }, winner: aTrades > bTrades ? 'a' : bTrades > aTrades ? 'b' : null },
+    { label: 'Win Rate', a: { val: aCls.winRate.toFixed(1) + '%', color: '' }, b: { val: bCls.winRate.toFixed(1) + '%', color: '' }, winner: aCls.winRate > bCls.winRate ? 'a' : bCls.winRate > aCls.winRate ? 'b' : null },
+    { label: 'Style', a: { val: aCls.tag, color: '', badge: aCls.tagColor }, b: { val: bCls.tag, color: '', badge: bCls.tagColor }, winner: null },
+    { label: 'Avg Trade', a: { val: formatTia(aCls.avgTradeSize) + ' TIA', color: '' }, b: { val: formatTia(bCls.avgTradeSize) + ' TIA', color: '' }, winner: aCls.avgTradeSize > bCls.avgTradeSize ? 'a' : bCls.avgTradeSize > aCls.avgTradeSize ? 'b' : null },
+  ];
+
+  document.getElementById('compare-col-a').innerHTML = `
+    <div class="text-sm font-bold text-emerald-500 mb-1">${aName}</div>
+    ${stats.map(s => `
+      <div class="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-3 text-center ${s.winner === 'a' ? 'ring-2 ring-emerald-500/50' : ''}">
+        ${s.badge ? `<span class="badge ${s.badge} text-white">${s.a.val}</span>` : `<span class="text-sm font-mono font-semibold ${s.a.color}">${s.a.val}</span>`}
+      </div>
+    `).join('')}
+  `;
+
+  document.getElementById('compare-col-b').innerHTML = `
+    <div class="text-sm font-bold text-violet-500 mb-1">${bName}</div>
+    ${stats.map(s => `
+      <div class="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-3 text-center ${s.winner === 'b' ? 'ring-2 ring-violet-500/50' : ''}">
+        ${s.badge ? `<span class="badge ${s.badge} text-white">${s.b.val}</span>` : `<span class="text-sm font-mono font-semibold ${s.b.color}">${s.b.val}</span>`}
+      </div>
+    `).join('')}
+  `;
+
+  document.getElementById('compare-col-vs').innerHTML = stats.map(s => `
+    <div class="flex items-center justify-center h-[44px]">
+      <span class="text-[10px] text-gray-400 font-medium uppercase tracking-wide">${s.label}</span>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// TOOLS TAB
+// ============================================================
+function renderToolsTab() {
+  renderAlerts();
+  renderToolsWatchlist();
+}
+
+async function lookupWallet() {
+  const input = document.getElementById('wallet-input');
+  const addr = input.value.trim();
+  if (!addr) { showToast('Please enter an address', 'warning'); return; }
+  const el = document.getElementById('wallet-result');
+  el.innerHTML = '<div class="skeleton h-24 w-full"></div>';
+  const data = await fetchJSON(`${API}/agents/${addr}`);
+  if (!data) { el.innerHTML = '<p class="text-red-500 text-xs text-center py-4">Agent not found</p>'; return; }
+  const name = data.username || data.name || shortenAddress(addr);
+  const pnl = data.pnlTia || data.pnl || data.totalPnl || 0;
+  const pnlF = formatPnl(pnl);
+  const cls = classifyAgent(data, state.activities);
+  const vol = data.totalVolumeTia || data.volumeTia || data.totalVolume || 0;
+  const trades = data.totalTrades || data.trades || data.tradeCount || 0;
+  el.innerHTML = `
+    <div class="space-y-2">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style="background:${getAgentColor(name)}">${getInitials(name)}</div>
+        <div>
+          <div class="font-medium text-sm">${name}</div>
+          <div class="text-[10px] text-gray-400 font-mono">${shortenAddress(addr)}</div>
+        </div>
+        <span class="badge ${cls.tagColor} text-white ml-auto">${cls.tag}</span>
+      </div>
+      <div class="grid grid-cols-3 gap-2 text-center text-xs">
+        <div class="bg-gray-50 dark:bg-zinc-800/50 rounded p-2"><div class="font-mono font-bold ${pnlF.positive ? 'text-emerald-500' : 'text-red-500'}">${pnlF.text}</div><div class="text-[10px] text-gray-400">PnL</div></div>
+        <div class="bg-gray-50 dark:bg-zinc-800/50 rounded p-2"><div class="font-mono font-bold">${formatTia(vol)}</div><div class="text-[10px] text-gray-400">Volume</div></div>
+        <div class="bg-gray-50 dark:bg-zinc-800/50 rounded p-2"><div class="font-mono font-bold">${trades}</div><div class="text-[10px] text-gray-400">Trades</div></div>
+      </div>
+    </div>
+  `;
+}
+
+function addAlert() {
+  const type = document.getElementById('alert-type').value;
+  const params = document.getElementById('alert-params').value.trim();
+  if (!params) { showToast('Please enter parameters', 'warning'); return; }
+  const alert = { id: Date.now().toString(), type, params, active: true, createdAt: new Date().toISOString() };
+  state.alerts.push(alert);
+  localStorage.setItem('bf_alerts', JSON.stringify(state.alerts));
+  document.getElementById('alert-params').value = '';
+  renderAlerts();
+  showToast('Alert added', 'success');
+}
+
+function removeAlert(id) {
+  state.alerts = state.alerts.filter(a => a.id !== id);
+  localStorage.setItem('bf_alerts', JSON.stringify(state.alerts));
+  renderAlerts();
+  showToast('Alert removed', 'info');
+}
+
+function renderAlerts() {
+  const el = document.getElementById('alert-list');
+  if (!state.alerts.length) { el.innerHTML = '<p class="text-xs text-gray-400 dark:text-zinc-500 text-center py-2">No alerts configured</p>'; return; }
+  el.innerHTML = state.alerts.map(a => `
+    <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-xs">
+      <span class="badge bg-zinc-600 text-white">${a.type.replace('_', ' ')}</span>
+      <span class="flex-1 truncate">${a.params}</span>
+      <button onclick="removeAlert('${a.id}')" class="text-gray-400 hover:text-red-500">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function requestNotificationPermission() {
+  if (!('Notification' in window)) { showToast('Notifications not supported', 'warning'); return; }
+  Notification.requestPermission().then(p => {
+    showToast(p === 'granted' ? 'Notifications enabled' : 'Notifications denied', p === 'granted' ? 'success' : 'warning');
+  });
+}
+
+function exportData(dataType, format) {
+  let data, filename;
+  if (dataType === 'leaderboard') {
+    data = state.leaderboard;
+    filename = 'leaderboard';
+  } else {
+    data = state.activities;
+    filename = 'activity';
+  }
+
+  if (!data.length) { showToast('No data to export', 'warning'); return; }
+
+  let content, mimeType, ext;
+  if (format === 'csv') {
+    const headers = Object.keys(data[0]);
+    const rows = data.map(d => headers.map(h => {
+      let v = d[h];
+      if (typeof v === 'object' && v !== null) v = JSON.stringify(v);
+      return '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    }).join(','));
+    content = [headers.join(','), ...rows].join('\n');
+    mimeType = 'text/csv';
+    ext = 'csv';
+  } else {
+    content = JSON.stringify(data, null, 2);
+    mimeType = 'application/json';
+    ext = 'json';
+  }
+
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `botfun-${filename}-${Date.now()}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`Exported ${dataType} as ${ext.toUpperCase()}`, 'success');
+}
+
+// ============================================================
+// WATCHLIST
+// ============================================================
+function toggleWatchlistAgent(addr, name) {
+  const idx = state.watchlist.findIndex(w => w.type === 'agent' && w.id === addr);
+  if (idx >= 0) {
+    state.watchlist.splice(idx, 1);
+    showToast('Removed from watchlist', 'info');
+  } else {
+    state.watchlist.push({ type: 'agent', id: addr, name });
+    showToast('Added to watchlist', 'success');
+  }
+  localStorage.setItem('bf_watchlist', JSON.stringify(state.watchlist));
+  renderLeaderboard();
+  renderAgentDetail();
+}
+
+function addToWatchlist() {
+  const input = document.getElementById('watchlist-add-input');
+  const val = input.value.trim();
+  if (!val) { showToast('Please enter a name or address', 'warning'); return; }
+  if (state.watchlist.some(w => w.id === val)) { showToast('Already in watchlist', 'warning'); return; }
+  state.watchlist.push({ type: 'coin', id: val, name: val });
+  localStorage.setItem('bf_watchlist', JSON.stringify(state.watchlist));
+  input.value = '';
+  renderToolsWatchlist();
+  renderWatchlistCoins();
+  showToast('Added to watchlist', 'success');
+}
+
+function removeFromWatchlist(id) {
+  state.watchlist = state.watchlist.filter(w => w.id !== id);
+  localStorage.setItem('bf_watchlist', JSON.stringify(state.watchlist));
+  renderToolsWatchlist();
+  renderWatchlistCoins();
+  renderLeaderboard();
+  showToast('Removed from watchlist', 'info');
+}
+
+function renderToolsWatchlist() {
+  const el = document.getElementById('tools-watchlist');
+  if (!state.watchlist.length) { el.innerHTML = '<p class="text-xs text-gray-400 dark:text-zinc-500 text-center py-4">No items in watchlist</p>'; return; }
+  el.innerHTML = state.watchlist.map(w => `
+    <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+      <span class="badge ${w.type === 'agent' ? 'bg-emerald-500' : 'bg-amber-500'} text-white">${w.type}</span>
+      <span class="text-xs font-medium flex-1 truncate">${w.name || shortenAddress(w.id)}</span>
+      <span class="text-[10px] text-gray-400 font-mono">${shortenAddress(w.id)}</span>
+      <button onclick="removeFromWatchlist('${w.id}')" class="text-gray-400 hover:text-red-500 transition-colors">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll() {
+  renderHeaderStats();
+  renderLeaderboard();
+  renderActivityFeed();
+  renderTrendingCoinsArena();
+  renderNewLaunches();
+  renderVolumeDetector();
+  renderInteractionGraph();
+  if (state.selectedAgent) renderAgentDetail();
+  // Re-render active tab
+  const activeTab = document.querySelector('.tab-btn.tab-active');
+  if (activeTab) {
+    const tab = activeTab.getAttribute('data-tab');
+    if (tab === 'coins') renderCoinsTab();
+    if (tab === 'social') renderSocialTab();
+    if (tab === 'compare') renderCompareTab();
+    if (tab === 'tools') renderToolsTab();
+  }
+}
+
+function refreshAll() {
+  showToast('Refreshing data...', 'info');
+  loadAll();
+}
+
+// ============================================================
+// AUTO REFRESH
+// ============================================================
+setInterval(() => {
+  loadAll();
+}, 30000);
+
+// ============================================================
+// INIT
+// ============================================================
+loadAll();
+</script>
+</body>
+</html>

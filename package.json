@@ -1,0 +1,11 @@
+{
+  "name": "botfun-arena-dashboard",
+  "version": "1.0.0",
+  "description": "Live bot.fun Arena Dashboard — onchain memecoin arena on Eden/Celestia L2",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  },
+  "keywords": ["botfun", "memecoin", "dashboard", "celestia", "eden"]
+}
